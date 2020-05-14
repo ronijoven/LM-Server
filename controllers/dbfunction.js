@@ -16,26 +16,22 @@ const getTableData = (req, res, db, dbname) => {
   const postTableData = (req, res, db, dbname) => {
     switch(dbname) {
       case "layout": {
-        const { name, size, layout } = req.body
-        var layouts = { 
-          lg: size==="lg" ? layout : [],
-          md: size==="md" ? layout : [],
-          sm: size==="md" ? layout : [],
-          xs: size==="md" ? layout : []
-        };
+        const { name, layouts, lg, md, sm, xs, xxs} = req.body
         db("layout")
           .insert(
-            { name, layouts }
+            { name, layouts, lg, md, sm, xs, xxs }
           )
           .returning('*')
           .then(item => {
             res.json(item)
           })
-        .catch(err => res.status(400).json({dbError: 'db error layout (insert data)'}))
+        .catch(err => res.status(400).json({
+          error: err,
+          dbError: 'db error layout (insert data)'
+        }))
         break;
       }
       default: {
-        //statements;
         break;
       }
     }
@@ -44,17 +40,24 @@ const getTableData = (req, res, db, dbname) => {
 const putTableData = (req, res, db, dbname) => {
     switch(dbname) {
       case "layout": {
-        const { id, size, name, layout } = req.body
-        var col_fld = "{"+size+"}";
+        const { id, size, name, layout, property } = req.body
+
+        var data_to_save = [];
+        if (size==="lg")  data_to_save = { name: name, lg: layout, lg_property: property };
+        if (size==="md")  data_to_save = { name: name, md: layout, md_property: property };
+        if (size==="sm")  data_to_save = { name: name, sm: layout, sm_property: property };
+        if (size==="xs")  data_to_save = { name: name, xs: layout, xs_property: property };
+        if (size==="xxs") data_to_save = { name: name, xxs: layout, xxs_property: property };
+          
         db('layout')
           .where({id})
-          .update({name: name, 
-            layouts: db.raw('jsonb_set(??, layouts, ?)', ['layouts', layout ])})
+          .update(data_to_save)
           .returning('*')
           .then(item => {
             res.json(item)
           })
           .catch(err => res.status(400).json({
+            data: data_to_save,
             error: err,
             dbError: 'db layout error (update data)'}))
         break;
