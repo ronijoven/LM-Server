@@ -10,25 +10,29 @@ const app = express();
 const port = process.env.PORT || 8002;
 
 // db Connection w/ localhost using knex
-const db = require('knex') ({
+const db_localhost = {
+  debug: false,
   client: 'pg',
   connection: {
     host : '127.0.0.1',
     user : 'postgres',
     password : 'root',
-    database : 'main_pos'
+    database : 'main_songbook'
   }
-});
+}
+const db_heroku = {
+  debug: false,
+  client: 'pg',
+  connection: {
+    host : 'ec2-54-86-170-8.compute-1.amazonaws.com',
+    user : 'tzmijzzjlofzfa',
+    password : '92a3d93798e1191f376298538b25c1332feb089af92201be0d7687aca4ef780b',
+    database : 'd9l8te8b3v1gfl'
+  }
+}
 
-// static user details
-const userData = {
-  userId: "789789",
-  password: "123456",
-  name: "Clue Mediator",
-  username: "cluemediator",
-  isAdmin: true
-};
-
+const db = require('knex') (db_localhost);
+console.log("db",db);
 // enable CORS
 app.use(cors());
 // parse application/json
@@ -36,9 +40,9 @@ app.use(bodyParser.json());
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: true }));
 
-
 //middleware that checks if JWT token exists and verifies it if it does exist.
 //In all future routes, this helps to know if the request is authenticated or not.
+
 app.use(function (req, res, next) {
   // check header or url parameters or post parameters for token
   var token = req.headers['authorization'];
@@ -66,37 +70,57 @@ app.get('/', (req, res) => {
   if (!req.user) return res.status(401).json(
       { success: false, 
         message: 'Invalid user to access it.' });
-    res.send('Welcome to the Node.js Tutorial! - ' + req.user.name);
+    res.send('Success-' + req.user.name);
 });
 
 // validate the user credentials
 app.post('/users/signin', function (req, res) {
-  const user = req.body.username;
-  const pwd = req.body.password;
-
-  // return 400 status if username/password is not exist
-  if (!user || !pwd) {
+  /*          Retrieve username and password
+              Check db if it exist
+              if ok generate a token and save token to db
+  */
+  const auser_email= req.body.email;
+  const apassword = req.body.password;
+  let user_email = auser_email.value;
+  let password = apassword.value;
+  //console.log("req.body", ausername, apassword);
+  //console.log("req.body values", username, password);
+  // validate username and password if null entry
+  if (!user_email || !password) {
     return res.status(400).json({
       error: true,
-      message: "Username or Password required."
+      message: "User Email or Password required."
     });
   }
-
-  // return 401 status if the credential is not match.
-  if (user !== userData.username || pwd !== userData.password) {
-    return res.status(401).json({
-      error: true,
-      message: "Username or Password is Wrong."
-    });
-  }
-
-  // generate token
-  const token = utils.generateToken(userData);
-  // get basic user details
-  const userObj = utils.getCleanUser(userData);
-  // return the token along with user details
-  return res.json({ user: userObj, token });
-
+  db("users")
+    .select('*')
+    .where({user_email : user_email, password : password })
+    .returning('*')
+    .then(response => {
+      if(response.length>0){
+        let item_user = response[0];
+        const userData = utils.getCleanUser(item_user);
+        const token = utils.generateToken(userData);
+        res.json({ 
+          dataExists: true,
+          items: userData, 
+          token: token
+         })
+      } else {
+        res.json({
+          dataExists: 'false',
+          error: { 
+            email: 'User Email does not Exist',
+            password: 'Password does not Match'
+          },
+          items:[]
+        })
+      }
+    })
+    .catch(err => res.status(400).json({
+        err:err,
+        dbError: 'db error query (request user)'})
+    )
 });
 
 // verify the token and return it if it's valid
@@ -117,7 +141,7 @@ app.get('/verifyToken', function (req, res) {
     });
 
     // return 401 status if the userId does not match.
-    if (user.userId !== userData.userId) {
+    if (user.id !== userData.id) {
       return res.status(401).json({
         error: true,
         message: "Invalid user."
@@ -129,11 +153,47 @@ app.get('/verifyToken', function (req, res) {
   });
 });
 
-app.get('/layout', (req, res) => main.getTableData(req, res, db, 'layout'))
-app.post('/layout', (req, res) => main.postTableData(req, res, db, 'layout'))
-app.put("/layout",  (req, res) => main.putTableData(req, res, db, 'layout'))
+app.get('/paging', (req, res) => main.getPagingTableData(req, res, db))
+app.get('/provider', (req, res) => main.getTableData(req, res, db, 'providers'))
+app.post('/provider', (req, res) => main.postTableData(req, res, db, 'providers'))
+app.put("/provider",  (req, res) => main.putTableData(req, res, db, 'providers'))
+app.get("/provider/col", (req, res) => main.getTableDataByColumn(req, res, db))
+app.get("/findsong", (req, res) => main.getTableSearch(req, res, db))
+app.get('/genre', (req, res) => main.getTableData(req, res, db, 'genre'))
+app.post('/genre', (req, res) => main.postTableData(req, res, db, 'genre'))
+app.put("/genre",  (req, res) => main.putTableData(req, res, db, 'genre'))
+app.get("/genre/col", (req, res) => main.getTableDataByColumn(req, res, db))
 
-app.get("/layout/col", (req, res) => main.getTableDataByColumn(req, res, db))
+app.get('/songs', (req, res) => main.getJoinTableData(req, res, db, 'songs'))
+app.post('/songs', (req, res) => main.postTableData(req, res, db, 'songs'))
+app.put("/songs",  (req, res) => main.putTableData(req, res, db, 'songs'))
+app.get("/songs/col", (req, res) => main.getTableDataByColumn(req, res, db))
+
+app.get('/artist', (req, res) => main.getTableData(req, res, db, 'artist'))
+app.post('/artist', (req, res) => main.postTableData(req, res, db, 'artist'))
+app.put("/artist",  (req, res) => main.putTableData(req, res, db, 'artist'))
+app.get("/artist/col", (req, res) => main.getTableDataByColumn(req, res, db))
+
+app.get('/allsongs', (req, res) => main.getTableData(req, res, db, 'view_allsongs'))
+app.get('/providers', (req, res) => main.getTableData(req, res, db, 'providers'))
+app.get('/models', (req, res) => main.getTableData(req, res, db, 'providers_model'))
+app.get('/allreserved', (req, res) => main.getTableData(req, res, db, 'view_reserved'))
+
+app.post('/reserved', (req, res) => main.postTableData(req, res, db, 'reserved'))
+
+app.delete('/api/delete', (req, res) => {
+  var reqData  = req.query;
+  var id = reqData.id
+  var dbname = reqData.dbname
+  db(dbname)
+    .where('id', id)
+    .del()
+    .then(item => {
+      res.json(item)
+    })
+    .catch(err => res.status(400).json({dbError: 'db error (delete) data)'})
+    )
+});
 
 app.listen(port, () => {
   console.log('Server started on: ' + port);

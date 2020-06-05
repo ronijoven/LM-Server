@@ -1,7 +1,7 @@
 {
-  "name": "main-server",
+  "name": "songguide-data-server",
   "version": "1.0.0",
-  "description": "Server for Basic App",
+  "description": "Server for Song Guide v1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node server.js",

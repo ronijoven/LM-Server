@@ -7,27 +7,23 @@ function generateToken(user) {
   //2. Use the information that are useful in other parts
   if (!user) return null;
  
-  var u = {
-    userId: user.userId,
-    name: user.name,
-    username: user.username,
-    isAdmin: user.isAdmin
-  };
- 
-  return jwt.sign(u, process.env.JWT_SECRET, {
+  return jwt.sign(user, process.env.JWT_SECRET, {
     expiresIn: 60 * 60 * 24 // expires in 24 hours
   });
 }
  
 // return basic user details
-function getCleanUser(user) {
-  if (!user) return null;
+function getCleanUser(item_user) {
+  if (!item_user) return null;
  
   return {
-    userId: user.userId,
-    name: user.name,
-    username: user.username,
-    isAdmin: user.isAdmin
+      id: item_user.id,
+      username: item_user.username,
+      password: item_user.password,
+      displayname: item_user.displayname,
+      user_email: item_user.user_email,
+      provider_id: item_user.provider_id,
+      provider_model_id: item_user.provider_model_id
   };
 }
  
