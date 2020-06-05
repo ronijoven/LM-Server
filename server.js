@@ -31,7 +31,7 @@ const db_heroku = {
   }
 }
 
-const db = require('knex') (db_localhost);
+const db = require('knex') (db_heroku);
 console.log("db",db);
 // enable CORS
 app.use(cors());
