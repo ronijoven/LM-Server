@@ -32,9 +32,10 @@ const getJoinTableData = (req, res, db, dbname) => {
       dbError: 'db error (get all data)'}))
 }
   
-const getTableData = (req, res, db, dbname) => {
+const getTableData = (req, res, db) => {
   var reqData  = req.query;
-  console.log("reqData",reqData);
+  var dbname = reqData.dbname;
+  //console.log("reqData",reqData);
   let query = db
     .select('*')
     .from(dbname);

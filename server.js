@@ -11,7 +11,7 @@ const port = process.env.PORT || 8002;
 
 // db Connection w/ localhost using knex
 const db_localhost = {
-  debug: false,
+  debug: true,
   client: 'pg',
   connection: {
     host : '127.0.0.1',
@@ -32,7 +32,6 @@ const db_heroku = {
 }
 
 const db = require('knex') (db_heroku);
-console.log("db",db);
 // enable CORS
 app.use(cors());
 // parse application/json
@@ -64,6 +63,7 @@ app.use(function (req, res, next) {
 
 // Controllers - aka, the db queries
 const main = require('./controllers/dbfunction');
+const e = require('express');
 
 // request handlers
 app.get('/', (req, res) => {
@@ -83,8 +83,6 @@ app.post('/users/signin', function (req, res) {
   const apassword = req.body.password;
   let user_email = auser_email.value;
   let password = apassword.value;
-  //console.log("req.body", ausername, apassword);
-  //console.log("req.body values", username, password);
   // validate username and password if null entry
   if (!user_email || !password) {
     return res.status(400).json({
@@ -122,7 +120,74 @@ app.post('/users/signin', function (req, res) {
         dbError: 'db error query (request user)'})
     )
 });
-
+app.post('/users/signup', function (req, res) {
+  const auser_email= req.body.email;
+  const apassword = req.body.password;
+  const adisplayname= req.body.name;
+  const amodel= req.body.model;
+  const aprovider_id = req.body.provider;
+  const ausername = req.body.username;
+  let provider_model_id = req.body.model_id;
+  let user_email = auser_email.value;
+  let password = apassword.value;
+  let username = ausername.value;
+  let displayname = adisplayname.value;
+  let provider_id = aprovider_id.value;
+  // validate email if it exist
+  db("users")
+    .select('*')
+    .where({user_email : user_email})
+    .returning('*')
+    .then(response => {
+      if(response.length>0){
+        res.json({
+          dataExists: true,
+          error: {field:"email", msg:"E-mail exist already, try again"},
+        })
+      } else {
+        data_to_save = {
+          username: username,
+          password: password,
+          displayname: displayname,
+          user_email: user_email,
+          provider_id: provider_id,
+          provider_model_id: provider_model_id
+        };
+        db("users")
+        .insert(data_to_save)
+        .returning('*')
+        .then(item_user => {
+          // save then generate token retrieve saved data
+          let user_data = {
+            id: item_user.id,
+            username: item_user.username,
+            password: item_user.password,
+            displayname: item_user.displayname,
+            user_email: item_user.user_email,
+            provider_id: item_user.provider_id,
+            provider_model_id: item_user.provider_model_id
+          };
+          const userData = utils.getCleanUser(user_data);
+          const token = utils.generateToken(user_data);
+          res.json({ 
+            dataExists: true,
+            error: [],
+            items: item_user, 
+            token: token
+          })
+        })
+        .catch(err => res.status(400).json({
+          data: data_to_save,
+          error: err,
+          dbError: 'db error ('+dbname+') layout (insert data)'})
+        )
+      }
+    })
+    .catch(err => res.status(400).json({
+      err:err,
+      dbError: 'db error query (request user signup)'})
+    )   
+});
 // verify the token and return it if it's valid
 app.get('/verifyToken', function (req, res) {
   // check header or url parameters or post parameters for token
@@ -153,13 +218,15 @@ app.get('/verifyToken', function (req, res) {
   });
 });
 
+app.get('/dbrequest', (req, res) => main.getTableData(req, res, db))
+
 app.get('/paging', (req, res) => main.getPagingTableData(req, res, db))
-app.get('/provider', (req, res) => main.getTableData(req, res, db, 'providers'))
+app.get('/provider', (req, res) => main.getTableData(req, res, db))
 app.post('/provider', (req, res) => main.postTableData(req, res, db, 'providers'))
 app.put("/provider",  (req, res) => main.putTableData(req, res, db, 'providers'))
 app.get("/provider/col", (req, res) => main.getTableDataByColumn(req, res, db))
 app.get("/findsong", (req, res) => main.getTableSearch(req, res, db))
-app.get('/genre', (req, res) => main.getTableData(req, res, db, 'genre'))
+app.get('/genre', (req, res) => main.getTableData(req, res, db))
 app.post('/genre', (req, res) => main.postTableData(req, res, db, 'genre'))
 app.put("/genre",  (req, res) => main.putTableData(req, res, db, 'genre'))
 app.get("/genre/col", (req, res) => main.getTableDataByColumn(req, res, db))
@@ -169,14 +236,14 @@ app.post('/songs', (req, res) => main.postTableData(req, res, db, 'songs'))
 app.put("/songs",  (req, res) => main.putTableData(req, res, db, 'songs'))
 app.get("/songs/col", (req, res) => main.getTableDataByColumn(req, res, db))
 
-app.get('/artist', (req, res) => main.getTableData(req, res, db, 'artist'))
+app.get('/artist', (req, res) => main.getTableData(req, res, db ))
 app.post('/artist', (req, res) => main.postTableData(req, res, db, 'artist'))
 app.put("/artist",  (req, res) => main.putTableData(req, res, db, 'artist'))
 app.get("/artist/col", (req, res) => main.getTableDataByColumn(req, res, db))
 
-app.get('/allsongs', (req, res) => main.getTableData(req, res, db, 'view_allsongs'))
-app.get('/providers', (req, res) => main.getTableData(req, res, db, 'providers'))
-app.get('/models', (req, res) => main.getTableData(req, res, db, 'providers_model'))
+app.get('/allsongs', (req, res) => main.getTableData(req, res, db ))
+app.get('/providers', (req, res) => main.getTableData(req, res, db))
+app.get('/models', (req, res) => main.getTableData(req, res, db))
 app.get('/allreserved', (req, res) => main.getTableData(req, res, db, 'view_reserved'))
 
 app.post('/reserved', (req, res) => main.postTableData(req, res, db, 'reserved'))
